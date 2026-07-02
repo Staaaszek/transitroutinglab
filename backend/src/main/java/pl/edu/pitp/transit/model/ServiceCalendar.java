@@ -22,6 +22,6 @@ public record ServiceCalendar(
         if (endDate != null && date.isAfter(endDate)) {
             return false;
         }
-        return activeDays.isEmpty() || activeDays.contains(date.getDayOfWeek());
+        return activeDays.contains(date.getDayOfWeek());
     }
 }

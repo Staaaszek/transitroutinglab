@@ -155,20 +155,30 @@ public class GtfsImporter {
 
     private void importStops(String source, Map<String, CsvTable> tables, ImportState state) {
         for (Map<String, String> row : rows(tables, "stops.txt")) {
-            String externalId = sourceKey(source, row.get("stop_id"));
+            String rawStopId = row.get("stop_id");
+            String stopName = row.getOrDefault("stop_name", "");
+            String stopCode = row.getOrDefault("stop_code", "");
+            String archiveStopKey = sourceKey(source, rawStopId);
+            String feedStopKey = globalStopKey(state.feedId, rawStopId, stopName, stopCode);
+            Integer existingStopId = state.globalStopIds.get(feedStopKey);
+            if (existingStopId != null) {
+                state.stopExternalIds.put(archiveStopKey, existingStopId);
+                continue;
+            }
             int id = state.stops.size();
             TransitStop stop = new TransitStop(
                     id,
                     state.feedId,
-                    externalId,
-                    row.getOrDefault("stop_name", ""),
-                    row.getOrDefault("stop_code", ""),
+                    feedStopKey,
+                    stopName,
+                    stopCode,
                     row.getOrDefault("platform_code", ""),
                     parseDouble(row.get("stop_lat")),
                     parseDouble(row.get("stop_lon"))
             );
             state.stops.add(stop);
-            state.stopExternalIds.put(externalId, id);
+            state.globalStopIds.put(feedStopKey, id);
+            state.stopExternalIds.put(archiveStopKey, id);
             state.stopsByName.computeIfAbsent(normalizeName(stop.name()), ignored -> new ArrayList<>()).add(id);
         }
     }
@@ -288,6 +298,13 @@ public class GtfsImporter {
         return source + ":" + id;
     }
 
+    private String globalStopKey(String feedId, String rawStopId, String stopName, String stopCode) {
+        if (stopCode != null && !stopCode.isBlank()) {
+            return feedId + ":stop-code:" + normalizeName(stopName) + ":" + stopCode.trim();
+        }
+        return sourceKey(feedId, rawStopId);
+    }
+
     private String normalizeName(String name) {
         return name == null ? "" : name.trim().replaceAll("\\s+", " ").toLowerCase();
     }
@@ -336,6 +353,7 @@ public class GtfsImporter {
         private final List<TransitStop> stops = new ArrayList<>();
         private final List<TripSegment> segments = new ArrayList<>();
         private final List<TransitTrip> trips = new ArrayList<>();
+        private final Map<String, Integer> globalStopIds = new LinkedHashMap<>();
         private final Map<String, Integer> stopExternalIds = new LinkedHashMap<>();
         private final Map<String, List<Integer>> stopsByName = new HashMap<>();
         private final Map<String, ServiceCalendar> calendars = new HashMap<>();
