@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+app:
+  gtfs:
+    cache-dir: "../data/gtfs"
+    refresh-on-start: false
+    feeds:
+      - id: "krakow"
+        name: "Krakow GTFS static"
+        urls:
+          - "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip"
+          - "https://gtfs.ztp.krakow.pl/GTFS_KRK_M.zip"
+          - "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
+        enabled: true
