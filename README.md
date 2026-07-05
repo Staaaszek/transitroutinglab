@@ -2,9 +2,12 @@
 
 Idea projektu to implementacja algorytmu RAPTOR wraz z frontendem i danymi umożliwiającymi uruchomienie go dla krakowskiej komunikacji miejskiej
 
-Frontend, oraz część backendu odpowiedzialna za abstrakcję nad danymi gtfs i komunikację z backendem zostały wygenerowane przy użyciu Codex GPT 5.5
+Frontend, oraz część backendu odpowiedzialna za abstrakcję nad danymi gtfs i komunikację z frontendem zostały w większości wygenerowane przy użyciu Codex GPT 5.5
 
 Implementacja algorytmu RAPTOR została zrobiona samodzielnie
+
+Po nacisnięciu na przystanek można zobaczyć najbliszże odjazdy z niego
+Po nacisnięciu na fragemtu trasy na mapie można zobaczyć informacje o danym kursie
 
 ## Uruchomienie
 
