@@ -11,7 +11,6 @@ import pl.edu.pitp.transit.model.TransitStop;
 import pl.edu.pitp.transit.model.TransitTrip;
 import pl.edu.pitp.transit.model.TripSegment;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -49,12 +48,10 @@ public class StopController {
     ) {
         TransitNetwork network = feedCatalog.get(feedId).network();
         LocalDateTime effective = dateTime == null ? LocalDateTime.now() : dateTime;
-        LocalDate date = effective.toLocalDate();
         int seconds = effective.toLocalTime().toSecondOfDay();
         return network.departuresFrom(stopId).stream()
                 .map(network::segment)
                 .filter(segment -> segment.departureSeconds() >= seconds)
-                .filter(segment -> network.serviceActive(segment.tripId(), date))
                 .sorted(Comparator.comparingInt(TripSegment::departureSeconds))
                 .limit(Math.max(1, Math.min(limit, 50)))
                 .map(segment -> departureDto(segment, network))

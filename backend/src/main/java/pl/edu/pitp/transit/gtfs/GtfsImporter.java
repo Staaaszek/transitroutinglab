@@ -32,6 +32,7 @@ public class GtfsImporter {
         for (Path archive : feed.archives()) {
             importArchive(feed.id(), archiveIndex++, archive, state);
         }
+        filterTripsToServiceDay(state, chooseServiceDay(state.calendars));
         List<List<Integer>> outgoing = groupSegmentsByFromStop(state.stops.size(), state.segments);
         List<List<Integer>> byTrip = groupSegmentsByTrip(state.trips.size(), state.segments);
         List<List<PlatformTransfer>> platformTransfers = buildPlatformCliques(state.stops, state.stopsByName);
@@ -44,8 +45,7 @@ public class GtfsImporter {
                 outgoing,
                 byTrip,
                 platformTransfers,
-                Map.copyOf(state.stopExternalIds),
-                Map.copyOf(state.calendars)
+                Map.copyOf(state.stopExternalIds)
         );
     }
 
@@ -240,6 +240,72 @@ public class GtfsImporter {
             }
         }
         return graph.stream().map(List::copyOf).toList();
+    }
+
+    private LocalDate chooseServiceDay(Map<String, ServiceCalendar> calendars) {
+        LocalDate today = LocalDate.now();
+        if (hasAnyServiceOn(calendars, today)) {
+            return today;
+        }
+        Map<LocalDate, Integer> addedServiceCounts = new HashMap<>();
+        for (ServiceCalendar calendar : calendars.values()) {
+            for (Map.Entry<LocalDate, Integer> exception : calendar.exceptions().entrySet()) {
+                if (exception.getValue() == 1) {
+                    addedServiceCounts.merge(exception.getKey(), 1, Integer::sum);
+                }
+            }
+        }
+        return addedServiceCounts.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(today);
+    }
+
+    private boolean hasAnyServiceOn(Map<String, ServiceCalendar> calendars, LocalDate date) {
+        return calendars.values().stream().anyMatch(calendar -> calendar.activeOn(date));
+    }
+
+    private void filterTripsToServiceDay(ImportState state, LocalDate serviceDay) {
+        List<TransitTrip> activeTrips = new ArrayList<>();
+        List<TripSegment> activeSegments = new ArrayList<>();
+        for (TransitTrip trip : state.trips) {
+            ServiceCalendar calendar = state.calendars.get(trip.serviceId());
+            if (calendar != null && !calendar.activeOn(serviceDay)) {
+                continue;
+            }
+            int newTripId = activeTrips.size();
+            List<Integer> segmentIds = new ArrayList<>();
+            for (int oldSegmentId : trip.segmentIds()) {
+                TripSegment old = state.segments.get(oldSegmentId);
+                int newSegmentId = activeSegments.size();
+                activeSegments.add(new TripSegment(
+                        newSegmentId,
+                        newTripId,
+                        old.routeId(),
+                        old.routeShortName(),
+                        old.fromStopId(),
+                        old.toStopId(),
+                        old.departureSeconds(),
+                        old.arrivalSeconds(),
+                        old.sequence()
+                ));
+                segmentIds.add(newSegmentId);
+            }
+            activeTrips.add(new TransitTrip(
+                    newTripId,
+                    trip.feedId(),
+                    trip.externalId(),
+                    trip.routeId(),
+                    trip.routeShortName(),
+                    trip.headsign(),
+                    trip.serviceId(),
+                    List.copyOf(segmentIds)
+            ));
+        }
+        state.trips.clear();
+        state.trips.addAll(activeTrips);
+        state.segments.clear();
+        state.segments.addAll(activeSegments);
     }
 
     private void validatePlatformCliques(Map<String, List<Integer>> stopsByName, List<List<PlatformTransfer>> graph) {

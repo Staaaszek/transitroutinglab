@@ -25,14 +25,19 @@ public class RoutingService {
 
     public ApiDtos.RoutingResponse search(ApiDtos.RoutingRequest request) {
         FeedCatalog.LoadedFeed feed = feedCatalog.get(request.feedId());
-        RoutingEngine engine = engineRegistry.get(request.engineId());
+        RoutingEngine engine = engineRegistry.get(feed, request.engineId());
+        LocalDateTime effectiveDateTime = effectiveDateTime(request);
         RoutingQuery query = new RoutingQuery(
                 request.fromStopId(),
                 request.toStopId(),
-                request.dateTime() == null ? LocalDateTime.now() : request.dateTime(),
+                effectiveDateTime.toLocalTime().toSecondOfDay(),
                 request.maxResults() == null ? 5 : Math.max(1, Math.min(20, request.maxResults())),
                 request.parameters() == null ? Map.of() : request.parameters()
         );
-        return mapper.toResponse(feed.id(), engine.id(), engine.findRoutes(query, feed.network()), feed.network());
+        return mapper.toResponse(feed.id(), engine.id(), engine.findRoutes(query), feed.network());
+    }
+
+    private LocalDateTime effectiveDateTime(ApiDtos.RoutingRequest request) {
+        return request.dateTime() == null ? LocalDateTime.now() : request.dateTime();
     }
 }

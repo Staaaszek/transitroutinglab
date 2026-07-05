@@ -1,13 +1,15 @@
 package pl.edu.pitp.transit.engine;
 
+import pl.edu.pitp.transit.model.TransitNetwork;
+
 import java.util.List;
 
-public interface RoutingEngine {
+public interface RoutingEngineFactory {
     String id();
 
     String displayName();
 
     List<EngineParameter> parameters();
 
-    RoutePlan findRoutes(RoutingQuery query);
+    RoutingEngine create(TransitNetwork network);
 }

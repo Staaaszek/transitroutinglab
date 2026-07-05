@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -50,7 +50,7 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || response.statusText);
+    throw new Error(errorMessage(text, response.statusText));
   }
   return response.json();
 }
@@ -77,6 +77,7 @@ function App() {
   const [tripStops, setTripStops] = useState<TripStops | null>(null);
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const resultsRef = useRef<HTMLElement | null>(null);
 
   const selectedEngine = engines.find((engine) => engine.id === engineId);
   const selectedRoute = routes.find((route) => route.id === selectedRouteId) ?? routes[0] ?? null;
@@ -142,7 +143,7 @@ function App() {
     setParameters(engine ? defaultParameters(engine) : {});
   }
 
-  async function selectStop(stop: Stop) {
+  const selectStop = useCallback(async (stop: Stop) => {
     setSelectedStop(stop);
     setSelectedLeg(null);
     setDepartures([]);
@@ -151,7 +152,19 @@ function App() {
     } catch {
       setDepartures([]);
     }
-  }
+  }, [dateTime, feedId]);
+
+  const scrollToResults = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
+  const handleMapLegClick = useCallback((leg: RouteLeg, legIndex: number) => {
+    if (selectedRoute) {
+      setSelectedLeg({ routeId: selectedRoute.id, legIndex, leg });
+    }
+  }, [selectedRoute]);
 
   async function runSearch() {
     if (!feedId || !engineId || !fromStop || !toStop) {
@@ -167,8 +180,10 @@ function App() {
       setSelectedStop(null);
       setSelectedLeg(null);
       setStatus(response.diagnostics.message);
+      scrollToResults();
     } catch (error) {
       setStatus(String(error instanceof Error ? error.message : error));
+      scrollToResults();
     } finally {
       setLoading(false);
     }
@@ -182,7 +197,7 @@ function App() {
         selectedRoute={selectedRoute}
         selectedLeg={selectedLeg}
         onStopClick={selectStop}
-        onLegClick={(leg, legIndex) => selectedRoute && setSelectedLeg({ routeId: selectedRoute.id, legIndex, leg })}
+        onLegClick={handleMapLegClick}
       />
 
       <aside className="panel">
@@ -230,23 +245,25 @@ function App() {
           <Play size={17} /> {loading ? 'Szukam...' : 'Szukaj tras'}
         </button>
 
-        {status && <div className="status">{status}</div>}
-
-        <section className="routes">
-          {routes.map((route) => (
-            <RouteCard
-              key={route.id}
-              route={route}
-              active={selectedRoute?.id === route.id}
-              selectedLegIndex={selectedLeg?.routeId === route.id ? selectedLeg.legIndex : null}
-              onSelect={() => setSelectedRouteId(route.id)}
-              onLegClick={(leg, index) => {
-                setSelectedRouteId(route.id);
-                setSelectedLeg({ routeId: route.id, legIndex: index, leg });
-                setSelectedStop(null);
-              }}
-            />
-          ))}
+        <section className="results" ref={resultsRef} aria-live="polite">
+          {status && <div className="status">{status}</div>}
+          {!loading && status && routes.length === 0 && <p className="empty">Brak tras do wyswietlenia.</p>}
+          <div className="routes" aria-label="Wyniki tras">
+            {routes.map((route) => (
+              <RouteCard
+                key={route.id}
+                route={route}
+                active={selectedRoute?.id === route.id}
+                selectedLegIndex={selectedLeg?.routeId === route.id ? selectedLeg.legIndex : null}
+                onSelect={() => setSelectedRouteId(route.id)}
+                onLegClick={(leg, index) => {
+                  setSelectedRouteId(route.id);
+                  setSelectedLeg({ routeId: route.id, legIndex: index, leg });
+                  setSelectedStop(null);
+                }}
+              />
+            ))}
+          </div>
         </section>
       </aside>
 
@@ -441,6 +458,16 @@ function CourseStop({ sequence, name, seconds, active }: { sequence: number; nam
 
 function defaultParameters(engine: Engine) {
   return Object.fromEntries(engine.parameters.map((parameter) => [parameter.name, parameter.defaultValue]));
+}
+
+function errorMessage(text: string, fallback: string) {
+  if (!text) return fallback;
+  try {
+    const parsed = JSON.parse(text) as { message?: string };
+    return parsed.message || text;
+  } catch {
+    return text;
+  }
 }
 
 function formatStop(stop: Stop) {

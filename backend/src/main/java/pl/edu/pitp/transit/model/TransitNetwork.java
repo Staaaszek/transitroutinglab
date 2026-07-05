@@ -1,6 +1,5 @@
 package pl.edu.pitp.transit.model;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -12,8 +11,7 @@ public record TransitNetwork(
         List<List<Integer>> outgoingSegmentsByStop,
         List<List<Integer>> segmentsByTrip,
         List<List<PlatformTransfer>> platformTransfersByStop,
-        Map<String, Integer> stopExternalIds,
-        Map<String, ServiceCalendar> calendars
+        Map<String, Integer> stopExternalIds
 ) {
     public TransitStop stop(int stopId) {
         return stops.get(stopId);
@@ -37,10 +35,5 @@ public record TransitNetwork(
 
     public List<PlatformTransfer> platformTransfersFrom(int stopId) {
         return platformTransfersByStop.get(stopId);
-    }
-
-    public boolean serviceActive(int tripId, LocalDate date) {
-        ServiceCalendar calendar = calendars.get(trip(tripId).serviceId());
-        return calendar == null || calendar.activeOn(date);
     }
 }
